@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/streadway/amqp"
 	"log"
+	"os"
 )
 
 var rabbitConn *amqp.Connection
@@ -12,7 +13,13 @@ var stockMessagesQueue amqp.Queue
 
 func setupRabbitMQ() {
 	var err error
-	rabbitConn, err = amqp.Dial("amqp://guest:guest@localhost:5672/")
+
+	rabbitURL := os.Getenv("RABBITMQ_URL")
+	if rabbitURL == "" {
+		rabbitURL = "amqp://guest:guest@rabbitmq:5672/"
+	}
+
+	rabbitConn, err = amqp.Dial(rabbitURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
 	}
@@ -59,7 +66,7 @@ func publishStockCommand(stockCode string) {
 			ContentType: "text/plain",
 			Body:        []byte(stockCode),
 		})
-	if err != nil {
-		log.Printf("Failed to publish stock command: %v", err)
+		if err != nil {
+			log.Printf("Failed to publish stock command: %v", err)
+		}
 	}
-}

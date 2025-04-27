@@ -3,7 +3,20 @@
 This project implements a simple web-based chat bot that allows users to interact with a system that provides stock quotes. The bot listens for stock commands, processes them, and responds with the corresponding stock information.
 
 ## Folder Structure
-
+chat-stock
+│
+├── main.go
+├── bot.go
+├── rabbit_mq.go
+├── templates/
+│   └── *.html
+├── static/
+│
+├── go.mod
+├── go.sum
+├── Dockerfile
+├── docker-compose.yml
+└── .dockerignore
 
 ## Overview
 
