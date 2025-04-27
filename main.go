@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"github.com/gorilla/websocket"
 	"sync"
+	"log"
 )
 
 var upgrader = websocket.Upgrader{
@@ -32,7 +33,6 @@ var (
 	mu        sync.Mutex
 )
 
-// generate a basic session ID
 func generateSessionID(username string) string {
 	return "session_" + username
 }
@@ -43,7 +43,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// POST
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	if users[username] == password {
@@ -67,7 +66,6 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		delete(sessionMap, cookie.Value)
 
-		// Clear cookie by setting MaxAge < 0
 		http.SetCookie(w, &http.Cookie{
 			Name:   "session",
 			Value:  "",
@@ -120,19 +118,15 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 		messageText := string(msg)
 
-	// Check if it's a /stock= command
 	if len(messageText) >= 7 && messageText[:7] == "/stock=" {
 		stockCode := messageText[7:]
 		fmt.Println("Received stock command for:", stockCode)
 
-		// Here we will publish to RabbitMQ later
-		// For now, just print
-		// Example: publishStockCommand(stockCode)
+		publishStockCommand(stockCode)
 
-		continue // Do NOT broadcast the command message to chat directly
+		continue
 	}
 
-	// Otherwise, normal chat message
 		broadcast <- fmt.Sprintf("%s: %s", client.username, string(msg))
 	}
 }
@@ -152,6 +146,58 @@ func handleMessages() {
 	}
 }
 
+func listenBotMessages() {
+	msgs, err := rabbitChannel.Consume(
+		"stock_messages",
+		"",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to register a consumer for bot messages: %v", err)
+	}
+
+	go func() {
+		for d := range msgs {
+			botMessage := string(d.Body)
+			broadcast <- botMessage
+		}
+	}()
+}
+
+func consumeBotMessages() {
+	msgs, err := rabbitChannel.Consume(
+		"stock_messages", // queue
+		"",             // consumer
+		true,           // auto-ack
+		false,          // exclusive
+		false,          // no-local
+		false,          // no-wait
+		nil,            // args
+	)
+	if err != nil {
+		log.Fatalf("Failed to consume stock messages: %v", err)
+	}
+
+	go func() {
+		for d := range msgs {
+			// d.Body contains the message from the bot
+			mu.Lock()
+			for client := range clients {
+				err := client.conn.WriteMessage(websocket.TextMessage, d.Body)
+				if err != nil {
+					client.conn.Close()
+					delete(clients, client)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+}
+
 func main() {
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/chat", chatHandler)
@@ -160,6 +206,9 @@ func main() {
 	go handleMessages()
 
 	setupRabbitMQ()
+	startBot()
+	listenBotMessages()
+	consumeBotMessages()
 
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 

@@ -8,6 +8,7 @@ import (
 var rabbitConn *amqp.Connection
 var rabbitChannel *amqp.Channel
 var stockQueue amqp.Queue
+var stockMessagesQueue amqp.Queue
 
 func setupRabbitMQ() {
 	var err error
@@ -22,15 +23,27 @@ func setupRabbitMQ() {
 	}
 
 	stockQueue, err = rabbitChannel.QueueDeclare(
-		"stock_commands", // Queue name
-		false,            // durable
-		false,            // delete when unused
-		false,            // exclusive
-		false,            // no-wait
-		nil,              // arguments
+		"stock_commands",
+		false,
+		false,
+		false,
+		false,
+		nil,
 	)
 	if err != nil {
-		log.Fatalf("Failed to declare a queue: %v", err)
+		log.Fatalf("Failed to declare stock_commands queue: %v", err)
+	}
+
+	stockMessagesQueue, err = rabbitChannel.QueueDeclare(
+		"stock_messages",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare stock_messages queue: %v", err)
 	}
 
 	log.Println("Connected to RabbitMQ and ready.")
@@ -38,10 +51,10 @@ func setupRabbitMQ() {
 
 func publishStockCommand(stockCode string) {
 	err := rabbitChannel.Publish(
-		"",                // exchange
-		stockQueue.Name,   // routing key (queue name)
-		false,             // mandatory
-		false,             // immediate
+		"",
+		"stock_commands",
+		false,
+		false,
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(stockCode),
