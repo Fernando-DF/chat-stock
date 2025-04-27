@@ -117,6 +117,22 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			conn.Close()
 			break
 		}
+
+		messageText := string(msg)
+
+	// Check if it's a /stock= command
+	if len(messageText) >= 7 && messageText[:7] == "/stock=" {
+		stockCode := messageText[7:]
+		fmt.Println("Received stock command for:", stockCode)
+
+		// Here we will publish to RabbitMQ later
+		// For now, just print
+		// Example: publishStockCommand(stockCode)
+
+		continue // Do NOT broadcast the command message to chat directly
+	}
+
+	// Otherwise, normal chat message
 		broadcast <- fmt.Sprintf("%s: %s", client.username, string(msg))
 	}
 }
@@ -142,6 +158,8 @@ func main() {
 	http.HandleFunc("/logout", logoutHandler)
 	http.HandleFunc("/ws", wsHandler)
 	go handleMessages()
+
+	setupRabbitMQ()
 
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
