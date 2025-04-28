@@ -4,6 +4,7 @@ import (
 	"github.com/streadway/amqp"
 	"log"
 	"os"
+	"time"
 )
 
 var rabbitConn *amqp.Connection
@@ -15,20 +16,32 @@ func setupRabbitMQ() {
 	var err error
 	rabbitURL := os.Getenv("RABBITMQ_URL")
 	if rabbitURL == "" {
-		rabbitURL = "amqp://guest:guest@localhost:5672/"
+		rabbitURL = "amqp://guest:guest@rabbitmq:5672/"
 	}
-
-	log.Printf("Connecting to RabbitMQ at %s", rabbitURL)
-	rabbitConn, err = amqp.Dial(rabbitURL)
+	
+	// Add retry logic for RabbitMQ connection
+	var conn *amqp.Connection
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		log.Printf("Attempting to connect to RabbitMQ at %s (attempt %d/%d)", rabbitURL, i+1, maxRetries)
+		conn, err = amqp.Dial(rabbitURL)
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to connect to RabbitMQ: %v. Retrying in 5 seconds...", err)
+		time.Sleep(5 * time.Second)
+	}
+	
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("Failed to connect to RabbitMQ after %d attempts: %v", maxRetries, err)
 	}
-
+	
+	rabbitConn = conn
 	rabbitChannel, err = rabbitConn.Channel()
 	if err != nil {
 		log.Fatalf("Failed to open a channel: %v", err)
 	}
-
+	
 	stockQueue, err = rabbitChannel.QueueDeclare(
 		"stock_commands",
 		true,  // durable
@@ -40,7 +53,7 @@ func setupRabbitMQ() {
 	if err != nil {
 		log.Fatalf("Failed to declare stock_commands queue: %v", err)
 	}
-
+	
 	stockMessagesQueue, err = rabbitChannel.QueueDeclare(
 		"stock_messages",
 		true,  // durable
@@ -52,7 +65,7 @@ func setupRabbitMQ() {
 	if err != nil {
 		log.Fatalf("Failed to declare stock_messages queue: %v", err)
 	}
-
+	
 	log.Println("Connected to RabbitMQ and ready.")
 }
 
