@@ -26,7 +26,6 @@ var (
 		"marcelo": "secret123",
 		"admin":   "admin123",
 	} // hardcoded user for now
-
 	sessionMap = map[string]string{} // sessionID -> username
 	clients   = make(map[*Client]bool)
 	broadcast = make(chan string)
@@ -42,13 +41,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		tpl.ExecuteTemplate(w, "login.html", nil)
 		return
 	}
-
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	if users[username] == password {
 		sessionID := generateSessionID(username)
 		sessionMap[sessionID] = username
-
 		http.SetCookie(w, &http.Cookie{
 			Name:  "session",
 			Value: sessionID,
@@ -57,7 +54,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/chat", http.StatusSeeOther)
 		return
 	}
-
 	tpl.ExecuteTemplate(w, "login.html", "Invalid credentials")
 }
 
@@ -65,7 +61,6 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session")
 	if err == nil {
 		delete(sessionMap, cookie.Value)
-
 		http.SetCookie(w, &http.Cookie{
 			Name:   "session",
 			Value:  "",
@@ -73,7 +68,6 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 			MaxAge: -1,
 		})
 	}
-
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -83,7 +77,6 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-
 	tpl.ExecuteTemplate(w, "chat.html", sessionMap[cookie.Value])
 }
 
@@ -94,17 +87,18 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := sessionMap[cookie.Value]
-
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println("WebSocket upgrade error:", err)
 		return
 	}
 	client := &Client{conn: conn, username: username}
-
 	mu.Lock()
 	clients[client] = true
 	mu.Unlock()
+
+	// Send welcome message
+	broadcast <- fmt.Sprintf("System: %s has joined the chat", username)
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -113,20 +107,16 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			delete(clients, client)
 			mu.Unlock()
 			conn.Close()
+			broadcast <- fmt.Sprintf("System: %s has left the chat", username)
 			break
 		}
-
 		messageText := string(msg)
-
-	if len(messageText) >= 7 && messageText[:7] == "/stock=" {
-		stockCode := messageText[7:]
-		fmt.Println("Received stock command for:", stockCode)
-
-		publishStockCommand(stockCode)
-
-		continue
-	}
-
+		if len(messageText) >= 7 && messageText[:7] == "/stock=" {
+			stockCode := messageText[7:]
+			fmt.Println("Received stock command for:", stockCode)
+			publishStockCommand(stockCode)
+			continue
+		}
 		broadcast <- fmt.Sprintf("%s: %s", client.username, string(msg))
 	}
 }
@@ -146,28 +136,6 @@ func handleMessages() {
 	}
 }
 
-func listenBotMessages() {
-	msgs, err := rabbitChannel.Consume(
-		"stock_messages",
-		"",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		log.Fatalf("Failed to register a consumer for bot messages: %v", err)
-	}
-
-	go func() {
-		for d := range msgs {
-			botMessage := string(d.Body)
-			broadcast <- botMessage
-		}
-	}()
-}
-
 func consumeBotMessages() {
 	msgs, err := rabbitChannel.Consume(
 		"stock_messages", // queue
@@ -181,7 +149,6 @@ func consumeBotMessages() {
 	if err != nil {
 		log.Fatalf("Failed to consume stock messages: %v", err)
 	}
-
 	go func() {
 		for d := range msgs {
 			// d.Body contains the message from the bot
@@ -203,15 +170,14 @@ func main() {
 	http.HandleFunc("/chat", chatHandler)
 	http.HandleFunc("/logout", logoutHandler)
 	http.HandleFunc("/ws", wsHandler)
+
 	go handleMessages()
 
 	setupRabbitMQ()
 	startBot()
-	listenBotMessages()
 	consumeBotMessages()
 
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-
 	fmt.Println("Server started at http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }

@@ -13,12 +13,12 @@ var stockMessagesQueue amqp.Queue
 
 func setupRabbitMQ() {
 	var err error
-
 	rabbitURL := os.Getenv("RABBITMQ_URL")
 	if rabbitURL == "" {
-		rabbitURL = "amqp://guest:guest@rabbitmq:5672/"
+		rabbitURL = "amqp://guest:guest@localhost:5672/"
 	}
 
+	log.Printf("Connecting to RabbitMQ at %s", rabbitURL)
 	rabbitConn, err = amqp.Dial(rabbitURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
@@ -31,10 +31,10 @@ func setupRabbitMQ() {
 
 	stockQueue, err = rabbitChannel.QueueDeclare(
 		"stock_commands",
-		false,
-		false,
-		false,
-		false,
+		true,  // durable
+		false, // auto-delete
+		false, // exclusive
+		false, // no-wait
 		nil,
 	)
 	if err != nil {
@@ -43,10 +43,10 @@ func setupRabbitMQ() {
 
 	stockMessagesQueue, err = rabbitChannel.QueueDeclare(
 		"stock_messages",
-		false,
-		false,
-		false,
-		false,
+		true,  // durable
+		false, // auto-delete
+		false, // exclusive
+		false, // no-wait
 		nil,
 	)
 	if err != nil {
@@ -57,16 +57,17 @@ func setupRabbitMQ() {
 }
 
 func publishStockCommand(stockCode string) {
+	log.Printf("Publishing stock command for: %s", stockCode)
 	err := rabbitChannel.Publish(
-		"",
-		"stock_commands",
-		false,
-		false,
+		"",                // exchange
+		"stock_commands",  // routing key
+		false,             // mandatory
+		false,             // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(stockCode),
 		})
-		if err != nil {
-			log.Printf("Failed to publish stock command: %v", err)
-		}
+	if err != nil {
+		log.Printf("Failed to publish stock command: %v", err)
 	}
+}
