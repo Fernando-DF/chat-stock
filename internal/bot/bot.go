@@ -12,6 +12,8 @@ import (
 	"chat-stock/internal/queue"
 )
 
+var apiBaseURL = "https://stooq.com"
+
 // StartBot launches the stock bot that listens for stock commands from RabbitMQ.
 func StartBot() {
 	log.Println("Starting stock bot service...")
@@ -49,9 +51,8 @@ func StartBot() {
 	log.Println("Bot started successfully and listening for commands")
 }
 
-// fetchStockQuote fetches the latest stock quote for the given stock code.
 func fetchStockQuote(stockCode string) (string, error) {
-	url := fmt.Sprintf("https://stooq.com/q/l/?s=%s.us&f=sd2t2ohlcv&h&e=csv", stockCode)
+	url := fmt.Sprintf("%s/q/l/?s=%s.us&f=sd2t2ohlcv&h&e=csv", apiBaseURL, stockCode)
 	log.Printf("Fetching stock data from URL: %s", url)
 
 	client := &http.Client{

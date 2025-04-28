@@ -96,6 +96,20 @@ make run
 make rebuild
 ```
 
+5. Run unit tests
+
+```bash
+make test
+```
+
+6. Show test coverage
+
+```bash
+make coverage
+```
+
+---
+
 ### Local Development (with Docker)
 
 

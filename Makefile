@@ -25,3 +25,10 @@ rebuild:
 	$(DOCKER_COMPOSE) down
 	$(DOCKER_COMPOSE) build --no-cache
 	$(DOCKER_COMPOSE) --env-file .env up --build
+
+test:
+	go test ./...
+
+cover:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out

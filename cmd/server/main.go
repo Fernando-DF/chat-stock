@@ -17,6 +17,8 @@ func main() {
 	http.HandleFunc("/logout", handlers.LogoutHandler)
 	http.HandleFunc("/ws", chat.WsHandler)
 
+	handlers.LoadTemplates()
+
 	go chat.HandleMessages()
 
 	queue.SetupRabbitMQ()

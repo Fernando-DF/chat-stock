@@ -7,16 +7,20 @@ import (
 )
 
 var (
-	tpl        = template.Must(template.ParseGlob("web/templates/*.html"))
+	tpl *template.Template
 
 	// hadcoded users, for now ! TODO : Use SQLite to store users
-	users      = map[string]string{
+	users = map[string]string{
 		"marcelo": "secret123",
 		"admin":   "admin123",
 	}
 	sessionMap = make(map[string]string) // sessionID -> username
-	mu         sync.Mutex
+	mu sync.Mutex
 )
+
+func LoadTemplates() {
+	tpl = template.Must(template.ParseGlob("web/templates/*.html"))
+}
 
 // generateSessionID creates a basic session ID (could be improved later).
 func generateSessionID(username string) string {
