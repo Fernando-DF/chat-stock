@@ -1,4 +1,4 @@
-package main
+package bot
 
 import (
 	"encoding/csv"
@@ -8,19 +8,21 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"github.com/streadway/amqp"
+
+	"chat-stock/internal/queue"
 )
 
-func startBot() {
+// StartBot launches the stock bot that listens for stock commands from RabbitMQ.
+func StartBot() {
 	log.Println("Starting stock bot service...")
 
-	msgs, err := rabbitChannel.Consume(
-		stockQueue.Name, // "stock_commands" queue
-		"",              // consumer
-		true,            // auto-ack
-		false,           // exclusive
-		false,           // no-local
-		false,           // no-wait
+	msgs, err := queue.RabbitChannel().Consume(
+		"stock_commands",
+		"",
+		true,
+		false,
+		false,
+		false,
 		nil,
 	)
 	if err != nil {
@@ -35,18 +37,19 @@ func startBot() {
 			price, err := fetchStockQuote(stockCode)
 			if err != nil {
 				log.Printf("Error fetching stock: %v", err)
-				publishBotMessage(fmt.Sprintf("Bot: Failed to fetch stock price for %s: %v", stockCode, err))
+				queue.PublishBotMessage(fmt.Sprintf("Bot: Failed to fetch stock price for %s: %v", stockCode, err))
 				continue
 			}
 
 			botMsg := fmt.Sprintf("Bot: %s quote is $%s per share", strings.ToUpper(stockCode), price)
-			publishBotMessage(botMsg)
+			queue.PublishBotMessage(botMsg)
 		}
 	}()
 
 	log.Println("Bot started successfully and listening for commands")
 }
 
+// fetchStockQuote fetches the latest stock quote for the given stock code.
 func fetchStockQuote(stockCode string) (string, error) {
 	url := fmt.Sprintf("https://stooq.com/q/l/?s=%s.us&f=sd2t2ohlcv&h&e=csv", stockCode)
 	log.Printf("Fetching stock data from URL: %s", url)
@@ -65,26 +68,21 @@ func fetchStockQuote(stockCode string) (string, error) {
 		return "", fmt.Errorf("API returned non-OK status: %d %s", resp.StatusCode, resp.Status)
 	}
 
-	// Read the entire response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// Uncomment for debugging if needed
-	// log.Printf("API Response body: %s", string(body))
-
-	// Parse as CSV
 	reader := csv.NewReader(strings.NewReader(string(body)))
 
-	// Read header
+	// Read CSV header
 	header, err := reader.Read()
 	if err != nil {
 		return "", fmt.Errorf("failed to read CSV header: %v", err)
 	}
 	log.Printf("CSV Header: %v", header)
 
-	// Read data record
+	// Read CSV record
 	record, err := reader.Read()
 	if err == io.EOF {
 		return "", fmt.Errorf("no data received")
@@ -92,10 +90,9 @@ func fetchStockQuote(stockCode string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read CSV: %v", err)
 	}
-
 	log.Printf("CSV Record: %v", record)
 
-	// Find the Close price column
+	// Find Close column
 	closeIndex := -1
 	for i, colName := range header {
 		if strings.ToLower(colName) == "close" {
@@ -104,16 +101,14 @@ func fetchStockQuote(stockCode string) (string, error) {
 		}
 	}
 
-	// If we couldn't find the Close column, use a default index (6 is typical)
 	if closeIndex == -1 {
 		if len(record) >= 7 {
-			closeIndex = 6
+			closeIndex = 6 // Default to index 6 if no header found
 		} else {
 			return "", fmt.Errorf("couldn't determine close price column and record doesn't have enough columns")
 		}
 	}
 
-	// Check if we have enough columns in the record
 	if len(record) <= closeIndex {
 		return "", fmt.Errorf("CSV data does not contain enough columns")
 	}
@@ -124,20 +119,4 @@ func fetchStockQuote(stockCode string) (string, error) {
 	}
 
 	return price, nil
-}
-
-func publishBotMessage(message string) {
-	log.Printf("Publishing bot message: %s", message)
-	err := rabbitChannel.Publish(
-		"",              // exchange
-		"stock_messages", // routing key
-		false,           // mandatory
-		false,           // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(message),
-		})
-	if err != nil {
-		log.Printf("Failed to publish bot message: %v", err)
-	}
 }

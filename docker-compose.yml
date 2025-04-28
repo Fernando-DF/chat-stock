@@ -5,8 +5,8 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"   # AMQP port
-      - "15672:15672" # Management UI
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # RabbitMQ Management UI
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
@@ -30,12 +30,13 @@ services:
     depends_on:
       - rabbitmq
     environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_URL=${RABBITMQ_URL}
+    volumes:
+      - ./web/templates:/app/web/templates
     networks:
       - chat-network
-    volumes:
-      - ./templates:/app/templates
-      - ./static:/app/static
+    env_file:
+      - .env
 
 networks:
   chat-network:

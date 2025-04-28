@@ -1,6 +1,33 @@
-# .dockerignore
+# Binaries
+server
+chat-app
+
+# Go build cache
+*.out
+
+# Vendor folder (if using go mod vendor)
+vendor/
+
+# Static analysis / tooling outputs
+*.test
+coverage.out
+
+# IDE and editor folders/files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Git
 .git
-vendor
-node_modules
-tmp
+.gitignore
+
+# Other temp files
 *.log
+*.tmp
+*.bak
+*.old

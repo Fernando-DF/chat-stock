@@ -1,60 +1,110 @@
 # Stock Chat Bot
 
-This project implements a simple web-based chat bot that allows users to interact with a system that provides stock quotes. The bot listens for stock commands, processes them, and responds with the corresponding stock information.
+This project implements a simple web-based chat bot that allows users to interact with a system providing real-time stock quotes.
+The bot listens for stock commands, processes them asynchronously through RabbitMQ, and responds with the requested stock information.
 
-## Folder Structure
-chat-stock
-│
-├── main.go
-├── bot.go
-├── rabbit_mq.go
-├── templates/
-│   └── *.html
-├── static/
-│
+---
+
+## Project Structure
+
+├── cmd
+│   └── server
+├── docker-compose.yml
+├── Dockerfile
+├── docs
+│   └── go-challenge-financial-chat_5cd0c06df1e48.pdf
 ├── go.mod
 ├── go.sum
-├── Dockerfile
-├── docker-compose.yml
-└── .dockerignore
+├── .env
+├── internal
+│   ├── bot
+│   ├── chat
+│   ├── handlers
+│   └── queue
+├── Makefile
+├── README.md
+├── static
+└── web
+    └── templates
+
+
+---
 
 ## Overview
 
-The Stock Chat Bot is a simple web application that allows users to enter stock symbols (e.g., `APPL.US`) and receive the corresponding stock information. It utilizes RabbitMQ for messaging, which allows for asynchronous communication between components. The bot listens for stock commands from the users, processes them, and responds with the requested stock quote.
+The Stock Chat Bot is a lightweight web application where users can:
+- **Login** with predefined credentials.
+- **Chat** in real-time using WebSocket.
+- **Request stock quotes** using `/stock=CODE` (e.g., `/stock=AAPL`).
+- **Receive real-time updates** from a stock bot fetching live data.
 
-### Core Components
+The application uses:
+- **WebSocket** for real-time chat.
+- **RabbitMQ** for asynchronous messaging between users and bot.
+- **Go** (Golang) for backend server, bot, and message processing.
 
-1. **Web Server**: The main entry point of the application is the web server, which is implemented in `main.go`. This file sets up the HTTP server, routes, and serves the HTML templates (such as the login page and the chat interface).
+---
 
-2. **RabbitMQ Integration**: The system uses RabbitMQ for message queuing. The `rabbit_queue.go` file handles the setup and communication with RabbitMQ, including message publishing and consuming. This ensures that stock commands can be processed asynchronously.
+## Core Components
 
-3. **Bot Logic**: The `bot.go` file is responsible for the bot's core functionality. It listens for stock commands, retrieves the requested stock information, and sends the response back to the user.
+| Component     | Description |
+|:--------------|:------------|
+| **Web Server** | Handles HTTP routes and upgrades connections to WebSocket. |
+| **Chat System** | Manages WebSocket clients and broadcasts messages. |
+| **Stock Bot** | Listens to stock requests, fetches quotes, and responds back. |
+| **RabbitMQ** | Manages message queues for communication between chat users and the bot. |
+| **Templates** | HTML frontend for login and chat pages. |
 
-4. **HTML Templates**: The `templates` folder contains HTML files used to render the user interface. The `login.html` template handles user authentication, while the `chat.html` template renders the chat interface where users can input stock commands.
-
-5. **Static Assets**: The `static` folder contains CSS, JavaScript, and image files that are used for styling and interactivity in the frontend.
+---
 
 ## Setup Instructions
 
 ### Prerequisites
 
-Before running the application, ensure that you have the following software installed:
+- [Go 1.20+](https://golang.org/dl/)
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/)
 
-- Go 1.18 or later
-- RabbitMQ server (for message queuing)
+(If you use Docker, you don't need to install RabbitMQ separately.)
 
-### Installing Dependencies
+---
+
+### Local Development (without Docker)
 
 1. Clone the repository:
 
-   ```bash
-   git clone https://github.com/your_username/stock-chat-bot.git
-   cd stock-chat-bot
-   ```
+```bash
+git clone https://github.com/your_username/chat-stock.git
+cd chat-stock
+```
+
 2. Install dependencies:
-
-   ```bash
+```bash
 go mod tidy
-   ```
+```
+
+3. Build and run
+
+```bash
+make build
+make run
+```
+
+4. Full Rebuild
+
+```bash
+make rebuild
+```
+
+### Local Development (with Docker)
 
 
+4. Running:
+```bash
+make up
+```
+
+5. Stop and remove containers:
+```bash
+make down
+```
